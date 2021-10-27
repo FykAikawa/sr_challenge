@@ -15,10 +15,11 @@ import os
 from statistics import mean
 import tensorflow_model_optimization as tfmot
 import random
+from NAdaBelief import Nadabelief
 quantize_model = tfmot.quantization.keras.quantize_model
 
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-batch_size = 16
+batch_size = 8
 
 class MyDataLoader():
     def __init__(self,scale):
@@ -105,16 +106,15 @@ def test_step(model_R,epoch,name,scale,batch_size):
 epoch=0
 start=time.time()
 scale=3
-name="base7_m6_f40_c20_nadabelief_fast"
+name="base7_m6_c20_nada"
 model = base7(scale)
 best_psnr = 0
 waiting = 0
-#model.summary()
 train_summary_writer = tf.summary.create_file_writer(f"./logs/train/{name}_{scale}_bs{batch_size}")
 valid_summary_writer = tf.summary.create_file_writer(f"./logs/valid/{name}_{scale}_bs{batch_size}")
 loss_object = tf.keras.losses.MeanSquaredError()
 train_ds=MyDataLoader(scale)
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001*(batch_size/8)),
+model.compile(optimizer=Nadabelief(learning_rate=0.0001*(batch_size/8)),
               loss='mean_squared_error')
 while time.time()-start<3600*12:
     hist = model.fit(train_ds,epochs=1,steps_per_epoch=50000//batch_size)
@@ -128,7 +128,7 @@ while time.time()-start<3600*12:
         best_psnr=psnr
     else:
         waiting+=1
-    if waiting>=5:
+    if waiting==10:
         waiting=0
         tf.keras.backend.set_value(model.optimizer.learning_rate,model.optimizer.learning_rate.numpy()/2)
         print(f"decayed to {model.optimizer.learning_rate.numpy()}")

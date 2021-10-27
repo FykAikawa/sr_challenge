@@ -110,13 +110,14 @@ def model_quantizer(model):
     with tfmot.quantization.keras.quantize_scope({'NoOpQuantizeConfig': NoOpQuantizeConfig, 'depth_to_space': depth_to_space, 'tf': tf}):
         q_model = tfmot.quantization.keras.quantize_apply(annotate_model)
     return q_model
-
-k_model = tf.keras.models.load_model(args[-1])
+k_model = tf.keras.models.load_model(args[-1],custom_objects={'Nadabelief':Nadabelief})
+#k_model = tf.keras.models.load_model(args[-1])
 psnr = test_step(k_model,0,3)
 model = model_quantizer(k_model)
 scale = 3
 model.summary()
-
+model.compile(optimizer=k_model.optimizer,
+              loss='mean_squared_error')
 train_ds=MyDataLoader(scale)
 count=0
 dame_flag=0
@@ -158,9 +159,10 @@ converter = tf.lite.TFLiteConverter.from_keras_model(best_model)
 OPTIMIZATIONS = [tf.lite.Optimize.DEFAULT]
 zenhan,kouhan = str(args[-1]).split("/")
 epoch = 0
-name = (zenhan.strip("_x3_bs"))[0].replace('param_','')+"_tflite"
+name = (zenhan.split("_x3_bs"))[0].replace('param_','')+"_tflite"
 CHECKPOINT_BASE=name
 OUT_DIR = "out_tfmodel"
+print(f"{CHECKPOINT_BASE}.tflite")
 converter.optimizations =  [tf.lite.Optimize.DEFAULT]
 converter.representative_dataset = representative_dataset
 converter.target_spec.supported_types = [tf.int8]
@@ -171,7 +173,7 @@ converter.inference_output_type = tf.uint8
 converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
 if not(os.path.isdir(f'{OUT_DIR}')):
     os.mkdir(f'{OUT_DIR}')
-tflite_filepath = os.path.join(OUT_DIR, f"{CHECKPOINT_BASE}1.tflite")
+tflite_filepath = os.path.join(OUT_DIR, f"{CHECKPOINT_BASE}.tflite")
 tflite_model = converter.convert()
 
 with open(tflite_filepath, "wb") as f:
