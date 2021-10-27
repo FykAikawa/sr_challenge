@@ -15,6 +15,7 @@ import os
 from statistics import mean
 import tensorflow_model_optimization as tfmot
 from tensorflow.keras.layers import Conv2D, Input, ReLU, Lambda
+from NAdaBelief import Nadabelief
 quantize_model = tfmot.quantization.keras.quantize_model
 import sys
 
@@ -30,8 +31,8 @@ def load_crop_resize(path):
 
 def representative_dataset():
     n=0
-    for i,x in enumerate(Path("resizeddiv").glob("**/*")):
-        if os.path.isfile(x) and i % 40 == 0:
+    for i,x in enumerate(Path("./D2K/X3/0{p:03d}x3.png").glob("**/*")):
+        if os.path.isfile(x) and i % 8 == 0:
             n+=1
             print(n)
             yield [np.expand_dims(np.asarray(load_crop_resize(x)),0).astype(np.float32)]
@@ -110,19 +111,17 @@ def model_quantizer(model):
         q_model = tfmot.quantization.keras.quantize_apply(annotate_model)
     return q_model
 
-k_model = tf.keras.models.load_model(args[-1],compile=False)
+k_model = tf.keras.models.load_model(args[-1])
 psnr = test_step(k_model,0,3)
 model = model_quantizer(k_model)
 scale = 3
 model.summary()
 
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001*(batch_size/8)),
-              loss='mean_squared_error')
-
 train_ds=MyDataLoader(scale)
 count=0
 dame_flag=0
 best_psnr=0
+waiting=0
 best_model=None
 while True:
     model.fit(train_ds,epochs=1,steps_per_epoch=40000//batch_size)
@@ -131,8 +130,16 @@ while True:
     if psnr_qat > best_psnr:
         best_model = model
         best_psnr = psnr_qat
+        count-=2
         print("updated")
-    if psnr_qat > psnr*0.999:
+        waiting=0
+    else:
+        waiting+=1
+    if waiting>=3:
+        waiting=0
+        tf.keras.backend.set_value(model.optimizer.learning_rate,model.optimizer.learning_rate.numpy()/2)
+        print(f"decayed to {model.optimizer.learning_rate.numpy()}")    
+    if psnr_qat > psnr:
         print("PSNR recovered")
         best_model = model
         break
@@ -141,6 +148,7 @@ while True:
         print("much time past so abort")
         break 
     count+=1
+    print(f"count={count}")
 
 input_name = best_model.input_names[0]
 index = best_model.input_names.index(input_name)
@@ -148,7 +156,10 @@ best_model.inputs[index].set_shape([1,360,640,3])
 
 converter = tf.lite.TFLiteConverter.from_keras_model(best_model)
 OPTIMIZATIONS = [tf.lite.Optimize.DEFAULT]
-CHECKPOINT_BASE="model_tflite"
+zenhan,kouhan = str(args[-1]).split("/")
+epoch = 0
+name = (zenhan.strip("_x3_bs"))[0].replace('param_','')+"_tflite"
+CHECKPOINT_BASE=name
 OUT_DIR = "out_tfmodel"
 converter.optimizations =  [tf.lite.Optimize.DEFAULT]
 converter.representative_dataset = representative_dataset
