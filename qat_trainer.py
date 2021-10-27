@@ -31,7 +31,7 @@ def load_crop_resize(path):
 
 def representative_dataset():
     n=0
-    for i,x in enumerate(Path("./D2K/X3/0{p:03d}x3.png").glob("**/*")):
+    for i,x in enumerate(Path("./D2K/X3").glob("**/*")):
         if os.path.isfile(x) and i % 8 == 0:
             n+=1
             print(n)
