@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Nadabelief optimizer implementation."""
+"""Nadam optimizer implementation."""
 
 import tensorflow.compat.v2 as tf
 from keras import backend_config
@@ -155,7 +155,7 @@ class Nadabelief(optimizer_v2.OptimizerV2):
     m_t_bar = (coefficients['one_minus_m_t'] * g_prime +
                coefficients['m_t_1'] * m_t_prime)
     var_t = var - coefficients['lr_t'] * m_t_bar / (
-        tf.sqrt(v_t_prime) + coefficients['epsilon'])
+        tf.sqrt(v_t_prime) + coefficients['epsilon'] + 1e-2/tf.cast(self.iterations+1,var_dtype))
     return tf.compat.v1.assign(var, var_t, use_locking=self._use_locking).op
 
   def _resource_apply_sparse(self, grad, var, indices, apply_state=None):

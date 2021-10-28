@@ -106,7 +106,7 @@ def test_step(model_R,epoch,name,scale,batch_size):
 epoch=0
 start=time.time()
 scale=3
-name="base7_m6_c20_nada"
+name="base7_m6_c20_chab"
 model = base7(scale)
 best_psnr = 0
 waiting = 0
@@ -114,8 +114,13 @@ train_summary_writer = tf.summary.create_file_writer(f"./logs/train/{name}_{scal
 valid_summary_writer = tf.summary.create_file_writer(f"./logs/valid/{name}_{scale}_bs{batch_size}")
 loss_object = tf.keras.losses.MeanSquaredError()
 train_ds=MyDataLoader(scale)
-model.compile(optimizer=Nadabelief(learning_rate=0.0001*(batch_size/8)),
-              loss='mean_squared_error')
+@tf.function
+def cl_loss(y_pred,y_true):
+    diff = y_true-y_pred
+    chab = tf.math.sqrt(diff*diff+1)
+    return tf.math.reduce_mean(chab,-1)
+model.compile(optimizer=Nadabelief(learning_rate=0.0002*(batch_size/8)),
+              loss=cl_loss)
 while time.time()-start<3600*12:
     hist = model.fit(train_ds,epochs=1,steps_per_epoch=50000//batch_size)
 
@@ -128,9 +133,9 @@ while time.time()-start<3600*12:
         best_psnr=psnr
     else:
         waiting+=1
-    if waiting==10:
+    if waiting==20:
         waiting=0
-        tf.keras.backend.set_value(model.optimizer.learning_rate,model.optimizer.learning_rate.numpy()/2)
+        tf.keras.backend.set_value(model.optimizer.learning_rate,max(5e-6,model.optimizer.learning_rate.numpy()/2))
         print(f"decayed to {model.optimizer.learning_rate.numpy()}")
     with valid_summary_writer.as_default():
         tf.summary.scalar('valid_psnr', psnr, step=epoch)

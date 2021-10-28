@@ -100,6 +100,12 @@ class NoOpQuantizeConfig(tfmot.quantization.keras.QuantizeConfig):
     def get_config(self):
         return {}
 
+@tf.function
+def cl_loss(y_pred,y_true):
+    diff = y_true-y_pred
+    chab = tf.math.sqrt(diff*diff+1)
+    return tf.math.reduce_mean(chab,-1)
+
 def model_quantizer(model):
     annotate_model = tf.keras.models.clone_model(
         model,
@@ -110,7 +116,7 @@ def model_quantizer(model):
     with tfmot.quantization.keras.quantize_scope({'NoOpQuantizeConfig': NoOpQuantizeConfig, 'depth_to_space': depth_to_space, 'tf': tf}):
         q_model = tfmot.quantization.keras.quantize_apply(annotate_model)
     return q_model
-k_model = tf.keras.models.load_model(args[-1],custom_objects={'Nadabelief':Nadabelief})
+k_model = tf.keras.models.load_model(args[-1],custom_objects={'Nadabelief':Nadabelief,'cl_loss':cl_loss})
 #k_model = tf.keras.models.load_model(args[-1])
 psnr = test_step(k_model,0,3)
 model = model_quantizer(k_model)
@@ -157,7 +163,7 @@ best_model.inputs[index].set_shape([1,360,640,3])
 
 converter = tf.lite.TFLiteConverter.from_keras_model(best_model)
 OPTIMIZATIONS = [tf.lite.Optimize.DEFAULT]
-zenhan,kouhan = str(args[-1]).split("/")
+zenhan,kouhan = str(args[-1]).split(os.sep)
 epoch = 0
 name = (zenhan.split("_x3_bs"))[0].replace('param_','')+"_tflite"
 CHECKPOINT_BASE=name
