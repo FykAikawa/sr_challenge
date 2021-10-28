@@ -123,7 +123,7 @@ model = model_quantizer(k_model)
 scale = 3
 model.summary()
 model.compile(optimizer=k_model.optimizer,
-              loss='mean_squared_error')
+              loss=k_model.loss)
 train_ds=MyDataLoader(scale)
 count=0
 dame_flag=0
